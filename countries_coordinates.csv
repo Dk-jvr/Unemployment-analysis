@@ -1,5 +1,5 @@
-,country_iso2,country_iso3,Numeric code,Latitude,Longitude
-"lon_lat = lon_lat.drop_duplicates(subset=['country_iso3'], keep='first')",AF,AFG,4,33,65
+Country,country_iso2,country_iso3,Numeric code,Latitude,Longitude
+Afghanistan,AF,AFG,4,33,65
 Åland Islands,AX,ALA,248,60.116667,19.9
 Albania,AL,ALB,8,41,20
 Algeria,DZ,DZA,12,28,3

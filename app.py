@@ -1,3 +1,5 @@
+import json
+
 from dash import Dash, html, dcc, Input, Output
 import dash_bootstrap_components as dbc
 
@@ -31,6 +33,12 @@ def display_page(pathname):
         return worldmap.get_layout()
     else:
         return index_page
+
+@app.callback(
+    Output('relayout-data', 'children'),
+    Input('basic-interactions', 'relayoutData'))
+def display_relayout_data(relayoutData):
+    print(relayoutData)#json.dumps(relayoutData, indent=2))
 
 worldmap.register_callbacks(app)
 
