@@ -5,7 +5,7 @@ import dash_bootstrap_components as dbc
 
 df = pd.read_csv("unemployment_analysis.csv", sep=',')
 
-years = [str(year) for year in range(1991, 2021)]
+years = [str(year) for year in range(1991, 2022)]
 continents = df['Continent'].unique()
 
 def get_layout():
