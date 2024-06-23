@@ -6,6 +6,11 @@ import dash_bootstrap_components as dbc
 
 df = pd.read_csv("unemployment_analysis.csv", sep=',')
 
+lon_lat = pd.read_csv("countries_coordinates.csv", sep=',')
+lon_lat = lon_lat.drop_duplicates(subset=['country_iso3'], keep='first')
+
+lon_lat = lon_lat[lon_lat['country_iso3'].isin(df['Country Code'])]
+
 years = [str(year) for year in range(1991, 2021)]
 continents = df['Continent'].unique()
 
@@ -43,6 +48,7 @@ def get_layout():
         
         dcc.Graph(id='world-map')
     ])
+
 
 def register_callbacks(app):
     @app.callback(
@@ -89,11 +95,46 @@ def register_callbacks(app):
         Input('selected-continents', 'children'),
         Input('year-dropdown', 'value')
     )
-    def update_map(selected_year):
+    def update_map(view_mode, selected_continents, selected_year):
+        selected_continents = [continent['props']['children'][0]['props']['children'] for continent in selected_continents]
+
+        if view_mode == 'countries':
+            filtered_df = df.copy()
+            if selected_continents:
+                filtered_df = df[df['Continent'].isin(selected_continents)]
+            text = [
+                f"Страна: {filtered_df['Country Name'][i]}<br>" \
+                f"Население: {filtered_df['Population'][i] / 10e5:.{1}f} млн<br>" \
+                f"Континент: {filtered_df['Continent'][i]}"
+                for i in filtered_df['Country Name'].index]
+
+            return show_map(selected_year, filtered_df['Country Code'], filtered_df[selected_year], text)
+        else:
+            # Группировка по континентам и расчет процентной безработицы
+            df['Unemployment_Count'] = (df[selected_year] * df['Population'] / 100).astype(int)
+            continent_df = df.groupby('Continent').agg(
+                Total_Unemployment=pd.NamedAgg(column='Unemployment_Count', aggfunc='sum'),
+                Total_Population=pd.NamedAgg(column='Population', aggfunc='sum')
+            ).reset_index()
+            continent_df['Unemployment_Rate'] = round((continent_df['Total_Unemployment'] / continent_df['Total_Population']) * 100, 2)
+
+            # Дублирование данных континентов для каждой страны в них
+            continent_countries = df[['Continent', 'Country Code', 'Country Name']].drop_duplicates()
+            continent_df = pd.merge(continent_countries, continent_df, on='Continent')
+
+            text = [
+                f"Страна: {continent_df['Country Name'][i]}<br>" \
+                f"Население континента: {continent_df['Total_Population'][i] / 10e5:.{1}f} млн<br>" \
+                f"Континент: {continent_df['Continent'][i]} index{i}"
+                for i in continent_df['Country Name'].index]
+            return show_map(selected_year, continent_df['Country Code'], continent_df['Unemployment_Rate'], text)
+
+    def show_map(selected_year, location_column, coloring_column, text_column):
+
         fig = go.Figure(data=go.Choropleth(
-            locations=df['Country Code'],
-            z=df[selected_year],
-            text=df['Country Name'],
+            locations=location_column,
+            z=coloring_column,
+            text=text_column,
             colorscale='plasma',
             autocolorscale=False,
             reversescale=True,
@@ -103,8 +144,40 @@ def register_callbacks(app):
             colorbar_title='Процент <br>безработицы %',
         ))
 
+        '''fig.update_geos(
+            visible=True,
+            projection=dict(
+                type='conic conformal',
+                parallels=[12.472944444, 35.172805555556],
+                rotation={'lat': 24, 'lon': 80}
+            ),
+            lonaxis={'range': [68, 98]},
+            lataxis={'range': [6, 38]}
+        )'''
+
+        fig.add_trace(go.Scattergeo(
+            lon=lon_lat['Longitude'],
+            lat=lon_lat['Latitude'],
+            mode='text',
+            # text=df['ST_NM'].str.title(),
+            text=lon_lat['Country'],
+            textfont={'color': 'Gray'},
+            name='',
+        ))
+
+        '''fig.add_scattergeo(
+            lon=lon_lat['Longitude'],
+            lat=lon_lat['Latitude'],
+            locations=lon_lat['Country'],
+            featureidkey='properties.name',
+            text=lon_lat['Country'],
+            mode='text',
+        )
+        fig.update_geos(fitbounds='locations')'''
         fig.update_layout(
             title_text=f'Уровень безработицы в {selected_year} году',
+            width=1280,
+            height=720,
             geo=dict(
                 showframe=False,
                 showcoastlines=False,
@@ -121,86 +194,4 @@ def register_callbacks(app):
             )]
         )
 
-        '''fig = px.choropleth(
-            df,
-            locations="Country Code",
-            color=selected_year,
-            hover_name="Country Name",
-            hover_data={
-                "Country Code": True,
-                "Population": True,
-                selected_year: True,
-            },
-            color_continuous_scale=px.colors.sequential.Plasma,
-            title=f"Уровень безработицы в {selected_year} году",
-            projection='equirectangular',
-        )
-    def update_map(view_mode, selected_continents, selected_year):
-        selected_continents = [continent['props']['children'][0]['props']['children'] for continent in selected_continents]
-
-        if view_mode == 'countries':
-            filtered_df = df
-            if selected_continents:
-                filtered_df = df[df['Continent'].isin(selected_continents)]
-            
-            fig = px.choropleth(
-                filtered_df,
-                locations="Country Code",
-                color=selected_year,
-                hover_name="Country Name",
-                hover_data={
-                    "Country Code": True,
-                    "Population": True,
-                    selected_year: True,
-                },
-                color_continuous_scale=px.colors.sequential.Plasma,
-                labels={selected_year: 'Процент безработицы'},
-                title=f"Уровень безработицы по странам в {selected_year} году",
-                projection='equirectangular'
-            )
-        else:
-            # Группировка по континентам и расчет процентной безработицы
-            df['Unemployment_Count'] = (df[selected_year] * df['Population'] / 100).astype(int)
-            continent_df = df.groupby('Continent').agg(
-                Total_Unemployment=pd.NamedAgg(column='Unemployment_Count', aggfunc='sum'),
-                Total_Population=pd.NamedAgg(column='Population', aggfunc='sum')
-            ).reset_index()
-            continent_df['Unemployment_Rate'] = (continent_df['Total_Unemployment'] / continent_df['Total_Population']) * 100
-
-            # Дублирование данных континентов для каждой страны в них
-            continent_countries = df[['Continent', 'Country Code', 'Country Name']].drop_duplicates()
-            continent_df = pd.merge(continent_countries, continent_df, on='Continent')
-
-            fig = px.choropleth(
-                continent_df,
-                locations="Country Code",
-                color='Unemployment_Rate',
-                hover_name="Continent",
-                hover_data={
-                    "Total_Unemployment": True,
-                    "Total_Population": True,
-                    "Unemployment_Rate": True,
-                },
-                color_continuous_scale=px.colors.sequential.Plasma,
-                labels={'Unemployment_Rate': 'Процент безработицы'},
-                title=f"Уровень безработицы по континентам в {selected_year} году",
-                projection='equirectangular'
-            )
-        
-        fig.update_geos(
-            showcoastlines=True, coastlinecolor="Black",
-            showland=True, landcolor="white",
-            showocean=True, oceancolor="LightBlue"
-        )'''
-
-        fig.update_layout(
-            width=1280,
-            height=720,
-            margin={"r":0,"t":50,"l":0,"b":0},
-            geo=dict(
-                projection_scale=1,
-                center=dict(lat=0, lon=0)
-            )
-        )
-        
         return fig
