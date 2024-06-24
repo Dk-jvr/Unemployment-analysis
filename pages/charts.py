@@ -14,8 +14,9 @@ def get_layout():
             dcc.Dropdown(
                 id='country-dropdown',
                 options=[{'label': country, 'value': country} for country in df['Country Name'].unique()],
-                value='Russian Federation', 
+                value='Russian Federation',
                 placeholder='Выберите страну',
+                clearable=False,
                 style={'flex': '1'}
             ),
             dbc.Button('Добавить страну', id='add-country-button', color='primary', n_clicks=0, style={'margin-left': '10px'}),
@@ -25,16 +26,14 @@ def get_layout():
             html.Div([
                 html.Span('Russian Federation', style={'margin-right': '10px'}),
                 dbc.Button('Удалить', id={'type': 'remove-country-button', 'index': 'Russian Federation'}, color='danger', size='sm', n_clicks=0, style={'font-size': '10px', 'padding': '2px 5px'})
+            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px', 'margin-bottom': '5px'}),
+            html.Div([
+                html.Span('Poland', style={'margin-right': '10px'}),
+                dbc.Button('Удалить', id={'type': 'remove-country-button', 'index': 'Poland'},
+                           color='danger', size='sm', n_clicks=0, style={'font-size': '10px', 'padding': '2px 5px'})
             ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px', 'margin-bottom': '5px'})
         ], style={'display': 'flex', 'flex-wrap': 'wrap', 'margin-bottom': '20px'}),
-        
-        dcc.Graph(id='line-chart'),
-        
-        html.Div([
-            dcc.Graph(id='heatmap', style={'flex': '1'}),
-            dcc.Graph(id='bar-chart', style={'flex': '1'}),
-        ], style={'display': 'flex', 'flex-wrap': 'wrap'}),
-        
+
         dcc.RangeSlider(
             id='year-range-slider',
             min=1991,
@@ -44,6 +43,13 @@ def get_layout():
             step=1,
             tooltip={"placement": "bottom", "always_visible": True}
         ),
+
+        dcc.Graph(id='line-chart'),
+        
+        html.Div([
+            dcc.Graph(id='heatmap', style={'flex': '1'}),
+            dcc.Graph(id='bar-chart', style={'flex': '1'}),
+        ], style={'display': 'flex', 'flex-wrap': 'wrap'}),
     ])
 
 def register_callbacks(app):
