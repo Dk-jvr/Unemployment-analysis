@@ -37,36 +37,43 @@ def get_layout():
     return html.Div([
         html.H1("Анализ уровня безработицы в странах по континентам"),
 
-        html.Div([
-            dcc.Dropdown(
-                id='continent-dropdown',
-                options=[{'label': continent, 'value': continent} for continent in continents.keys()],
-                value='Asia',
-                placeholder='Выберите континент',
-                clearable=False,
-                style={'width': '300px', 'margin-right': '20px', 'margin-left': 'auto', 'margin-right': 'auto'}
-            ),
-            dcc.Dropdown(
-                id='year-dropdown',
-                options=[{'label': str(year), 'value': year} for year in range(1992, 2021)],
-                value=2020,
-                placeholder='Выберите год',
-                clearable=False,
-                style={'width': '120px', 'margin-left': '20px', 'margin-right': 'auto'}
+        dbc.Row([
+            dbc.Col([
+                dcc.Dropdown(
+                    id='continent-dropdown',
+                    options=[{'label': continent, 'value': continent} for continent in continents.keys()],
+                    value='Asia',
+                    placeholder='Выберите континент',
+                    clearable=False,
+                    style={'width': '300px', 'margin-right': 'auto', 'margin-left': 'auto'}
+                ),
+            ], width={'size': 3, 'offset': 1}),
 
-            ),
-        ], style={'display': 'grid', 'grid-template-columns': 'auto auto', 'justify-content': 'center',
-                  'margin-bottom': '20px'}),
+            dbc.Col([
+                dcc.Dropdown(
+                    id='year-dropdown',
+                    options=[{'label': str(year), 'value': year} for year in range(1992, 2021)],
+                    value=2020,
+                    placeholder='Выберите год',
+                    clearable=False,
+                    style={'width': '300px', 'margin-left': 'auto', 'margin-right': 'auto'}
+                ),
+            ], width={'size': 3}),
 
-        html.Div([
-            html.H2('Топ-10 стран по безработице на планете'),
-            html.Table(id='top-countries-global-table', className='table'),
-        ], style={'width': '45%', 'display': 'inline-block', 'vertical-align': 'top', 'margin-right': '20px'}),
+        ], justify='center', style={'margin-bottom': '20px'}),
 
-        html.Div([
-            html.H2('Топ-10 стран по безработице на континенте'),
-            html.Table(id='top-countries-continent-table', className='table'),
-        ], style={'width': '45%', 'display': 'inline-block', 'vertical-align': 'top'}),
+        dbc.Row([
+            dbc.Col([
+                html.H2('Топ-10 стран по безработице на планете', style={'text-align': 'center'}),
+                html.Div(id='top-countries-global-table'),
+            ], width={'size': 5, 'offset': 1}),
+
+            dbc.Col([
+                html.H2('Топ-10 стран по безработице на континенте', style={'text-align': 'center'}),
+                html.Div(id='top-countries-continent-table'),
+            ], width={'size': 5}),
+
+        ]),
 
         dcc.Graph(id='deviation-bar-chart'),
         dcc.Graph(id='change-deviation-bar-chart'),
@@ -84,19 +91,23 @@ def register_callbacks(app):
 
         top_countries_df = get_top_countries_global(selected_year)
         table_rows = [
-            html.Tr([
-                html.Td('Страна'),
-                html.Td('Население'),
-                html.Td('Уровень безработицы'),
-            ])]
-        for index, row in top_countries_df.iterrows():
-            table_rows.append(
-                html.Tr([
-                    html.Td(row['Country Name']),
-                    html.Td(f"{row[str(selected_year) + '_population'] / 10e2:.{1}f} млн."),
-                    html.Td(f'{row[str(selected_year)]}%')
+            html.Table([
+                html.Thead([
+                    html.Tr([
+                        html.Th('Страна', style={'text-align': 'center'}),
+                        html.Th('Население', style={'text-align': 'center'}),
+                        html.Th('Уровень безработицы', style={'text-align': 'center'}),
+                    ])
+                ]),
+                html.Tbody([
+                    html.Tr([
+                        html.Td(row['Country Name'], style={'text-align': 'center'}),
+                        html.Td(f"{row[str(selected_year) + '_population'] / 10e2:.{1}f} млн.", style={'text-align': 'center'}),
+                        html.Td(f'{row[str(selected_year)]}%', style={'text-align': 'center'})
+                    ]) for index, row in top_countries_df.iterrows()
                 ])
-            )
+            ], className='table')
+        ]
         return table_rows
 
     @app.callback(
@@ -107,18 +118,21 @@ def register_callbacks(app):
     def update_top_countries_continent_table(selected_continent, selected_year):
         top_countries_df = get_top_countries_continent(selected_continent, selected_year)
         table_rows = [
-            html.Tr([
-                html.Td('Страна'),
-                html.Td('Уровень безработицы'),
-            ])
-        ]
-        for _, row in top_countries_df.iterrows():
-            table_rows.append(
-                html.Tr([
-                    html.Td(row['Country Name']),
-                    html.Td(f'{row[str(selected_year)]}%')
+            html.Table([
+                html.Thead([
+                    html.Tr([
+                        html.Th('Страна', style={'text-align': 'center'}),
+                        html.Th('Уровень безработицы', style={'text-align': 'center'}),
+                    ])
+                ]),
+                html.Tbody([
+                    html.Tr([
+                        html.Td(row['Country Name'], style={'text-align': 'center'}),
+                        html.Td(f'{row[str(selected_year)]}%', style={'text-align': 'center'})
+                    ]) for index, row in top_countries_df.iterrows()
                 ])
-            )
+            ], className='table')
+        ]
         return table_rows
 
     @app.callback(
