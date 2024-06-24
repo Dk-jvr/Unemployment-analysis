@@ -145,7 +145,8 @@ def register_callbacks(app):
                 f"Континент: {continent_df['Continent'][i]}<br>" \
                 f"Население континента: {continent_df['Total_Population'][i] / 10e2:.{1}f} млн<br>" \
                 for i in continent_df['Country Name'].index]
-            return show_map(selected_year, continent_df['Continent'].unique(), continent_df['Country Code'],
+            return show_map(selected_year, continent_df[['Continent', 'Unemployment_Rate']].drop_duplicates(),
+                            continent_df['Country Code'],
                             continent_df['Unemployment_Rate'], text, view_mode)
 
     def show_map(selected_year, country_column, location_column, coloring_column, text_column, view_mode):
@@ -181,18 +182,19 @@ def register_callbacks(app):
                 locations=location_column,
                 mode='text',
                 hoverinfo='skip',
-                text=['{}<br>{}%'.format(k, v) for k, v in zip(country_column, coloring_column)],
+                text=['{}<br>{}%'.format(k, v) for k, v in zip(country_column, coloring_column.unique())],
                 textfont={'color': 'black'},
                 hoverlabel=dict(namelength=0),
                 name='',
             ))
         else:
             fig.add_trace(go.Scattergeo(
-                lon=[continents_coordinates[continent][1] for continent in country_column],
-                lat=[continents_coordinates[continent][0] for continent in country_column],
+                lon=[continents_coordinates[continent][1] for continent in country_column['Continent']],
+                lat=[continents_coordinates[continent][0] for continent in country_column['Continent']],
                 mode='text',
                 hoverinfo='skip',
-                text=['{}<br>{}%'.format(k, v) for k, v in zip(country_column, coloring_column)],
+                text=['{}<br>{}%'.format(k, v) for k, v in
+                      zip(country_column['Continent'], country_column['Unemployment_Rate'])],
                 textfont={'size': 18, 'color': 'black'},
                 hoverlabel=dict(namelength=0),
                 name='',
