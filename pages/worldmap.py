@@ -121,7 +121,7 @@ def register_callbacks(app):
                 f"Континент: {filtered_df['Continent'][i]}"
                 for i in filtered_df['Country Name'].index]
 
-            return show_map(selected_year, filtered_df['Country Name'], filtered_df['Country Code'],
+            return show_map(selected_year, filtered_df[['Country Name', 'Country Code', selected_year]], filtered_df['Country Code'],
                             filtered_df[selected_year], text, view_mode)
         else:
             # Группировка по континентам и расчет процентной безработицы
@@ -149,7 +149,7 @@ def register_callbacks(app):
                             continent_df['Country Code'],
                             continent_df['Unemployment_Rate'], text, view_mode)
 
-    def show_map(selected_year, country_column, location_column, coloring_column, text_column, view_mode):
+    def show_map(selected_year, scatter_info, location_column, coloring_column, text_column, view_mode):
 
         fig = go.Figure(data=go.Choropleth(
             locations=location_column,
@@ -179,22 +179,22 @@ def register_callbacks(app):
 
         if view_mode == 'countries':
             fig.add_trace(go.Scattergeo(
-                locations=location_column,
+                locations=scatter_info['Country Code'],
                 mode='text',
                 hoverinfo='skip',
-                text=['{}<br>{}%'.format(k, v) for k, v in zip(country_column, coloring_column.unique())],
+                text=['{}<br>{}%'.format(k, v) for k, v in zip(scatter_info['Country Name'], scatter_info[selected_year])],
                 textfont={'color': 'black'},
                 hoverlabel=dict(namelength=0),
                 name='',
             ))
         else:
             fig.add_trace(go.Scattergeo(
-                lon=[continents_coordinates[continent][1] for continent in country_column['Continent']],
-                lat=[continents_coordinates[continent][0] for continent in country_column['Continent']],
+                lon=[continents_coordinates[continent][1] for continent in scatter_info['Continent']],
+                lat=[continents_coordinates[continent][0] for continent in scatter_info['Continent']],
                 mode='text',
                 hoverinfo='skip',
                 text=['{}<br>{}%'.format(k, v) for k, v in
-                      zip(country_column['Continent'], country_column['Unemployment_Rate'])],
+                      zip(scatter_info['Continent'], scatter_info['Unemployment_Rate'])],
                 textfont={'size': 18, 'color': 'black'},
                 hoverlabel=dict(namelength=0),
                 name='',
