@@ -3,17 +3,27 @@ import pandas as pd
 import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
 
-df = pd.read_csv("result.csv", sep=',')
+df = pd.read_csv("unemployment_analysis.csv", sep=',')
 
 population = pd.read_csv("World_Population_2020.csv", sep=',')
+
+continents_coordinates = {
+    "Asia": [42.283914, 78.224456],
+    "Africa": [16.918371, 19.168591],
+    "Oceania": [-23.054063, 134.243439],
+    "North America": [38.400949, -99.840222],
+    "South America": [-9.080489, -57.800021],
+    "Europe": [50.000885, 13.474729],
+    "America": [None, None],
+}
 
 years = [str(year) for year in range(1991, 2021)]
 continents = df['Continent'].unique()
 
+
 def get_layout():
     return html.Div([
         html.H1("Карта мира по показателям безработицы"),
-        
         dcc.RadioItems(
             id='view-mode',
             options=[
@@ -23,7 +33,6 @@ def get_layout():
             value='countries',
             labelStyle={'display': 'inline-block'}
         ),
-
         html.Div(id='continent-form', children=[
             dcc.Dropdown(
                 id='continent-dropdown',
@@ -41,8 +50,8 @@ def get_layout():
             value='2020',
             clearable=False
         ),
-        
-        dcc.Graph(id='world-map')
+
+        dcc.Graph(id='world-map'),
     ])
 
 
@@ -71,16 +80,21 @@ def register_callbacks(app):
 
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-        if 'add-button' in button_id and selected_continent:
-            if selected_continent not in [continent['props']['children'][0]['props']['children'] for continent in selected_continents]:
+        if 'add-button' in button_id:
+            if selected_continent and selected_continent not in [continent['props']['children'][0]['props']['children']
+                                                                 for continent in selected_continents]:
                 selected_continents.append(
                     html.Div([
                         html.Span(selected_continent, style={'margin-right': '10px'}),
-                        dbc.Button('Удалить', id={'type': 'remove-button', 'index': selected_continent}, color='danger', size='sm', n_clicks=0, style={'font-size': '10px', 'padding': '2px 5px'})
-                    ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px', 'margin-bottom': '5px'})
+                        dbc.Button('Удалить', id={'type': 'remove-button', 'index': selected_continent}, color='danger',
+                                   size='sm', n_clicks=0, style={'font-size': '10px', 'padding': '2px 5px'})
+                    ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px',
+                              'margin-bottom': '5px'})
                 )
         else:
-            selected_continents = [continent for continent in selected_continents if continent['props']['children'][0]['props']['children'] != button_index]
+            button_index = eval(button_id)['index']
+            selected_continents = [continent for continent in selected_continents if
+                                   continent['props']['children'][0]['props']['children'] != button_index]
 
         return selected_continents
 
@@ -88,13 +102,15 @@ def register_callbacks(app):
         Output('world-map', 'figure'),
         Input('view-mode', 'value'),
         Input('selected-continents', 'children'),
-        Input('year-dropdown', 'value')
+        Input('year-dropdown', 'value'),
     )
     def update_map(view_mode, selected_continents, selected_year):
-        selected_continents = [continent['props']['children'][0]['props']['children'] for continent in selected_continents]
+
+        selected_continents = [continent['props']['children'][0]['props']['children'] for continent in
+                               selected_continents]
 
         merged_df = df.merge(population[['Numeric code', selected_year]], how='left', on='Numeric code',
-                                        suffixes=('', '_population'))
+                             suffixes=('', '_population'))
         if view_mode == 'countries':
             filtered_df = merged_df
             if selected_continents:
@@ -105,7 +121,8 @@ def register_callbacks(app):
                 f"Континент: {filtered_df['Continent'][i]}"
                 for i in filtered_df['Country Name'].index]
 
-            return show_map(selected_year, filtered_df['Country Name'], filtered_df['Country Code'], filtered_df[selected_year], text)
+            return show_map(selected_year, filtered_df['Country Name'], filtered_df['Country Code'],
+                            filtered_df[selected_year], text, view_mode)
         else:
             # Группировка по континентам и расчет процентной безработицы
             merged_df['Unemployment_Count'] = merged_df[selected_year] * merged_df[f'{selected_year}_population'] / 100
@@ -113,20 +130,25 @@ def register_callbacks(app):
                 Total_Unemployment=pd.NamedAgg(column='Unemployment_Count', aggfunc='sum'),
                 Total_Population=pd.NamedAgg(column=f'{selected_year}_population', aggfunc='sum')
             ).reset_index()
-            continent_df['Unemployment_Rate'] = round((continent_df['Total_Unemployment'] / continent_df['Total_Population']) * 100, 2)
+            continent_df['Unemployment_Rate'] = round(
+                (continent_df['Total_Unemployment'] / continent_df['Total_Population']) * 100, 2)
 
             # Дублирование данных континентов для каждой страны в них
-            continent_countries = merged_df[['Continent', 'Country Code', 'Country Name']].drop_duplicates()
+            continent_countries = merged_df[['Continent', 'Country Code', 'Country Name', selected_year,
+                                             f'{selected_year}_population']].drop_duplicates()
             continent_df = pd.merge(continent_countries, continent_df, on='Continent')
 
             text = [
                 f"Страна: {continent_df['Country Name'][i]}<br>" \
+                f"Локальная безработица: {continent_df[selected_year][i]}%<br>" \
+                f"Население страны: {continent_df[f'{selected_year}_population'][i] / 10e2:.{1}f} млн<br>"
+                f"Континент: {continent_df['Continent'][i]}<br>" \
                 f"Население континента: {continent_df['Total_Population'][i] / 10e2:.{1}f} млн<br>" \
-                f"Континент: {continent_df['Continent'][i]}"
                 for i in continent_df['Country Name'].index]
-            return show_map(selected_year, continent_df['Country Name'], continent_df['Country Code'], continent_df['Unemployment_Rate'], text)
+            return show_map(selected_year, continent_df['Continent'].unique(), continent_df['Country Code'],
+                            continent_df['Unemployment_Rate'], text, view_mode)
 
-    def show_map(selected_year, country_column, location_column, coloring_column, text_column):
+    def show_map(selected_year, country_column, location_column, coloring_column, text_column, view_mode):
 
         fig = go.Figure(data=go.Choropleth(
             locations=location_column,
@@ -146,26 +168,39 @@ def register_callbacks(app):
             visible=True,
             projection=dict(
                 type='conic conformal',
-                parallels=[60, 100],#[12.472944444, 35.172805555556],
-                rotation={'lat': 15, 'lon': 0}
+                parallels=[0, 0],
+                rotation={'lat': 15, 'lon': 0},
+                scale=2 if view_mode == 'countries' else 0.7,
             ),
-            lonaxis={'range': [0, 120]},
-            lataxis={'range': [0, 60]}
+            lonaxis={'range': [30, 180]},
+            lataxis={'range': [15, 75]}
         )
 
-        fig.add_trace(go.Scattergeo(
-            locations=location_column,
-            mode='text',
-            hoverinfo='skip',
-            text=['{}<br>{}%'.format(k,v) for k,v in zip(country_column, df[selected_year])],
-            textfont={'color': 'Gray'},
-            hoverlabel=dict(namelength=0),
-            name='',
-        ))
+        if view_mode == 'countries':
+            fig.add_trace(go.Scattergeo(
+                locations=location_column,
+                mode='text',
+                hoverinfo='skip',
+                text=['{}<br>{}%'.format(k, v) for k, v in zip(country_column, coloring_column)],
+                textfont={'color': 'black'},
+                hoverlabel=dict(namelength=0),
+                name='',
+            ))
+        else:
+            fig.add_trace(go.Scattergeo(
+                lon=[continents_coordinates[continent][1] for continent in country_column],
+                lat=[continents_coordinates[continent][0] for continent in country_column],
+                mode='text',
+                hoverinfo='skip',
+                text=['{}<br>{}%'.format(k, v) for k, v in zip(country_column, coloring_column)],
+                textfont={'size': 18, 'color': 'black'},
+                hoverlabel=dict(namelength=0),
+                name='',
+            ))
 
         fig.update_layout(
             title_text=f'Уровень безработицы в {selected_year} году',
-            width=1280,
+            width=1380,
             height=720,
             geo=dict(
                 showframe=False,
@@ -174,11 +209,11 @@ def register_callbacks(app):
             ),
             annotations=[dict(
                 x=0.5,
-                y=0,
+                y=-0.05,
                 xref='paper',
                 yref='paper',
-                text='Source: TODO', #<a href="https://www.cia.gov/library/publications/the-world-factbook/fields/2195.html">\
-                    #CIA World Factbook</a>',
+                text='Source: <a href="https://www.kaggle.com/datasets/pantanjali/unemployment-dataset">Country\'s '
+                     'unemployment rate from past 31 years</a>',
                 showarrow=False
             )],
         )
