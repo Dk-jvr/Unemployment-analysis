@@ -14,7 +14,7 @@ def get_layout():
             dcc.Dropdown(
                 id='country-dropdown',
                 options=[{'label': country, 'value': country} for country in df['Country Name'].unique()],
-                value='Russian Federation',
+                value=None,
                 placeholder='Выберите страну',
                 clearable=False,
                 style={'flex': '1'}
@@ -29,32 +29,38 @@ def get_layout():
             ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px', 'margin-bottom': '5px'}),
             html.Div([
                 html.Span('Poland', style={'margin-right': '10px'}),
-                dbc.Button('Удалить', id={'type': 'remove-country-button', 'index': 'Poland'},
-                           color='danger', size='sm', n_clicks=0, style={'font-size': '10px', 'padding': '2px 5px'})
+                dbc.Button('Удалить', id={'type': 'remove-country-button', 'index': 'Poland'}, color='danger', size='sm', n_clicks=0, style={'font-size': '10px', 'padding': '2px 5px'})
             ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px', 'margin-bottom': '5px'})
         ], style={'display': 'flex', 'flex-wrap': 'wrap', 'margin-bottom': '20px'}),
 
         dcc.RangeSlider(
             id='year-range-slider',
             min=1991,
-            max=2021,
-            value=[1991, 2021],
-            marks={str(year): str(year) for year in range(1991, 2022)},
+            max=2020,
+            value=[1991, 2020],
+            marks={str(year): str(year) for year in range(1991, 2021)},
             step=1,
             tooltip={"placement": "bottom", "always_visible": True}
         ),
 
-        dcc.Graph(id='line-chart'),
-        
+        html.Div([
+            dcc.Graph(id='line-chart'),
+        ], style={'margin-bottom': '20px'}),
+
         html.Div([
             dcc.Graph(id='heatmap', style={'flex': '1'}),
+        ], style={'margin-bottom': '20px'}),
+
+        html.Div([
             dcc.Graph(id='bar-chart', style={'flex': '1'}),
-        ], style={'display': 'flex', 'flex-wrap': 'wrap'}),
+        ], style={'margin-bottom': '20px'}),
     ])
+
 
 def register_callbacks(app):
     @app.callback(
         Output('selected-countries', 'children'),
+        Output('country-dropdown', 'value'),
         Input('add-country-button', 'n_clicks'),
         Input({'type': 'remove-country-button', 'index': ALL}, 'n_clicks'),
         State('country-dropdown', 'value'),
@@ -63,7 +69,7 @@ def register_callbacks(app):
     def manage_countries(add_clicks, remove_clicks, selected_country, selected_countries):
         ctx = callback_context
         if not ctx.triggered:
-            return selected_countries
+            return selected_countries, selected_country
 
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
@@ -75,11 +81,12 @@ def register_callbacks(app):
                         dbc.Button('Удалить', id={'type': 'remove-country-button', 'index': selected_country}, color='danger', size='sm', n_clicks=0, style={'font-size': '10px', 'padding': '2px 5px'})
                     ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px', 'margin-bottom': '5px'})
                 )
+            selected_country = None
         else:
             button_index = eval(button_id)['index']
             selected_countries = [country for country in selected_countries if country['props']['children'][0]['props']['children'] != button_index]
         
-        return selected_countries
+        return selected_countries, selected_country
 
     @app.callback(
         Output('line-chart', 'figure'),
@@ -99,7 +106,7 @@ def register_callbacks(app):
         df_long = df_long[(df_long['Year'] >= year_range[0]) & (df_long['Year'] <= year_range[1])]
         
         line_fig = px.line(df_long, x='Year', y='Unemployment Rate', color='Country Name', title='Динамика уровня безработицы по странам')
-        line_fig.update_traces(mode='lines+markers', hovertemplate='Год: %{x}<br>Страна: %{text}<br>Безработица: %{y}%', text=df_long['Country Name'])
+        line_fig.update_traces(mode='lines+markers', hovertemplate='Год: %{x}<br>Безработица: %{y}%')
         line_fig.update_layout(
             xaxis_title='Год', 
             yaxis_title='Уровень безработицы',
@@ -122,15 +129,24 @@ def register_callbacks(app):
 
         df_long['Previous Year Unemployment Rate'] = df_long.groupby('Country Name')['Unemployment Rate'].shift(1)
         df_long['Change'] = df_long['Unemployment Rate'] - df_long['Previous Year Unemployment Rate']
-        bar_fig = px.bar(df_long.dropna(), x='Year', y='Change', color='Country Name', title='Изменение уровня безработицы по годам')
+        
+        bar_fig = go.Figure()
+        for country in df_long['Country Name'].unique():
+            country_data = df_long[df_long['Country Name'] == country]
+            bar_fig.add_trace(go.Bar(
+                x=country_data['Year'],
+                y=country_data['Change'],
+                name=country,
+                text=country_data['Country Name'],
+                hovertemplate='Год: %{x}<br>Страна: %{text}<br>Изменение уровня безработицы: %{y}%',
+            ))
+
         bar_fig.update_layout(
-            xaxis_title='Год', 
+            title='Изменение уровня безработицы по годам',
+            xaxis_title='Год',
             yaxis_title='Изменение уровня безработицы',
-            legend_title='Страна'
-        )
-        bar_fig.update_traces(
-            hovertemplate='Год: %{x}<br>Страна: %{text}<br>Изменение уровня безработицы: %{y}%',
-            text=df_long['Country Name']
+            legend_title='Страна',
+            barmode='group'
         )
         
         return line_fig, heatmap_fig, bar_fig
